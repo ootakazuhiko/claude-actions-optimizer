@@ -1,0 +1,56 @@
+name: Test Claude Actions Optimizer
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-installation:
+    name: Test ${{ matrix.project-type }} installation
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project-type: [nodejs, python, generic]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create test project
+        run: |
+          mkdir test-${{ matrix.project-type }}
+          cd test-${{ matrix.project-type }}
+          
+          # Create minimal project structure
+          if [ "${{ matrix.project-type }}" = "nodejs" ]; then
+            echo '{"name": "test-project", "version": "1.0.0"}' > package.json
+          elif [ "${{ matrix.project-type }}" = "python" ]; then
+            echo "requests==2.31.0" > requirements.txt
+          fi
+          
+      - name: Test quick deployment
+        run: |
+          cd test-${{ matrix.project-type }}
+          ../quick-deploy.sh . ${{ matrix.project-type }}
+          
+      - name: Verify installation
+        run: |
+          cd test-${{ matrix.project-type }}
+          [ -f "CLAUDE.md" ] && echo "✅ CLAUDE.md created"
+          [ -f ".github/disable-all-workflows.sh" ] && echo "✅ Emergency scripts created"
+          [ -f ".github/workflows/optimized-ci.yml" ] && echo "✅ Workflow created"
+          [ -f ".claude-optimization-enabled" ] && echo "✅ Optimization flag created"
+          
+  test-as-action:
+    name: Test as GitHub Action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create test project
+        run: mkdir test-action && cd test-action && echo '{"name": "test"}' > package.json
+        
+      - uses: ./
+        with:
+          project-type: nodejs
+          mode: quick

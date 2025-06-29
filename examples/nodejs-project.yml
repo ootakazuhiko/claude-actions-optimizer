@@ -1,0 +1,106 @@
+# Node.js プロジェクト用の最適化ワークフロー例
+
+name: Node.js Optimized CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, master]
+
+jobs:
+  # Draft PR用の軽量チェック
+  draft-checks:
+    name: Draft PR Light Checks
+    if: github.event.pull_request.draft == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies (production only)
+        run: npm ci --production --ignore-scripts
+        
+      - name: Quick lint check
+        run: |
+          if [ -f "package.json" ] && grep -q '"lint"' package.json; then
+            npm run lint
+          else
+            echo "No lint script found, skipping"
+          fi
+          
+      - name: Type check (if TypeScript)
+        run: |
+          if [ -f "tsconfig.json" ]; then
+            npx tsc --noEmit
+          else
+            echo "No TypeScript config found, skipping"
+          fi
+
+  # Ready PR用のフルCI
+  full-ci:
+    name: Full CI Pipeline
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+        
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run linter
+        run: npm run lint
+        
+      - name: Run type check
+        if: hashFiles('tsconfig.json') != ''
+        run: npx tsc --noEmit
+        
+      - name: Run tests
+        run: npm test
+        
+      - name: Run coverage
+        if: matrix.node-version == 20
+        run: npm run test:coverage
+        
+      - name: Build
+        run: npm run build
+        
+      - name: Upload coverage
+        if: matrix.node-version == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+  # セキュリティチェック
+  security-scan:
+    name: Security Scan
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        
+      - name: Check for known vulnerabilities
+        run: |
+          if [ -f "package-lock.json" ]; then
+            npx audit-ci --config .auditci.json || true
+          fi

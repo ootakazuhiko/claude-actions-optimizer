@@ -1,0 +1,34 @@
+{
+  "name": "claude-actions-optimizer",
+  "version": "1.0.0",
+  "description": "Universal GitHub Actions cost optimization for Claude Code AI",
+  "main": "bin/cli.js",
+  "bin": {
+    "claude-optimizer": "./bin/cli.js"
+  },
+  "scripts": {
+    "init": "node bin/init.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "github-actions",
+    "claude-code",
+    "cost-optimization",
+    "ci-cd",
+    "automation"
+  ],
+  "author": "Kazuhiko Oota",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ootakazuhiko/claude-actions-optimizer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ootakazuhiko/claude-actions-optimizer/issues"
+  },
+  "homepage": "https://github.com/ootakazuhiko/claude-actions-optimizer#readme",
+  "preferGlobal": true,
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

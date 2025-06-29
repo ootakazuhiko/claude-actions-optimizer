@@ -1,0 +1,32 @@
+name: 'Claude Actions Optimizer'
+description: 'Optimize GitHub Actions costs for Claude Code usage'
+branding:
+  icon: 'zap'
+  color: 'blue'
+
+inputs:
+  project-type:
+    description: 'Project type (nodejs, python, generic, auto)'
+    required: false
+    default: 'auto'
+  mode:
+    description: 'Installation mode (full, quick)'
+    required: false
+    default: 'quick'
+
+outputs:
+  optimization-status:
+    description: 'Optimization installation status'
+    
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Claude Actions Optimizer
+      shell: bash
+      run: |
+        if [ "${{ inputs.mode }}" = "full" ]; then
+          ${{ github.action_path }}/install.sh
+        else
+          ${{ github.action_path }}/quick-deploy.sh . ${{ inputs.project-type }}
+        fi
+        echo "optimization-status=installed" >> $GITHUB_OUTPUT
