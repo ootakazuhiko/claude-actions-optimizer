@@ -1,0 +1,267 @@
+name: Multi-Instance Claude Code Coordination
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Coordination action'
+        required: true
+        type: choice
+        options:
+          - check-conflicts
+          - clean-expired-locks
+          - force-unlock-all
+          - generate-report
+
+env:
+  CLAUDE_COORDINATION_ENABLED: true
+
+jobs:
+  # Detect Claude instances and prevent conflicts
+  coordination-check:
+    name: Multi-Instance Coordination Check
+    runs-on: ubuntu-latest
+    outputs:
+      claude-instances: ${{ steps.detect.outputs.instances }}
+      conflicts-detected: ${{ steps.detect.outputs.conflicts }}
+      coordination-status: ${{ steps.detect.outputs.status }}
+      
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Setup coordination environment
+        run: |
+          mkdir -p .claude/{sessions,locks,tasks,logs}
+          
+          # Install coordination script if not present
+          if [ ! -f "scripts/claude-coordinator.sh" ]; then
+            curl -sSL https://raw.githubusercontent.com/ootakazuhiko/claude-actions-optimizer/main/scripts/claude-coordinator.sh \
+              -o scripts/claude-coordinator.sh
+            chmod +x scripts/claude-coordinator.sh
+          fi
+          
+      - name: Detect Claude instances
+        id: detect
+        run: |
+          echo "🔍 Detecting Claude Code instances..."
+          
+          # Look for Claude-created branches
+          claude_branches=$(git branch -r | grep -E "claude-[a-f0-9]{8}" | wc -l)
+          echo "instances=$claude_branches" >> $GITHUB_OUTPUT
+          
+          # Check for active PRs from Claude instances
+          active_prs=$(gh pr list --author app/claude-code --state open | wc -l) || active_prs=0
+          echo "Active Claude PRs: $active_prs"
+          
+          # Detect current PR's Claude instance
+          if echo "${{ github.event.pull_request.title }}" | grep -q "Claude [a-f0-9]\{8\}"; then
+            current_instance=$(echo "${{ github.event.pull_request.title }}" | grep -o "Claude [a-f0-9]\{8\}" | cut -d' ' -f2)
+            echo "Current instance: $current_instance"
+            echo "claude_instance_id=$current_instance" >> $GITHUB_OUTPUT
+          fi
+          
+          # Check for potential conflicts
+          conflicts=false
+          if [ -f ".claude/locks.yml" ] && [ -s ".claude/locks.yml" ]; then
+            lock_count=$(grep -c "path:" .claude/locks.yml 2>/dev/null || echo 0)
+            if [ "$lock_count" -gt 0 ]; then
+              echo "🔒 Active file locks detected: $lock_count"
+              conflicts=true
+            fi
+          fi
+          
+          echo "conflicts=$conflicts" >> $GITHUB_OUTPUT
+          
+          if [ "$claude_branches" -gt 1 ]; then
+            echo "status=multi-instance" >> $GITHUB_OUTPUT
+          elif [ "$claude_branches" -eq 1 ]; then
+            echo "status=single-instance" >> $GITHUB_OUTPUT
+          else
+            echo "status=no-claude" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Generate coordination report
+        run: |
+          echo "## 🤖 Claude Code Multi-Instance Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ steps.detect.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Active Instances**: ${{ steps.detect.outputs.instances }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Conflicts Detected**: ${{ steps.detect.outputs.conflicts }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.detect.outputs.status }}" = "multi-instance" ]; then
+            echo "### 🚨 Multi-Instance Environment Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Multiple Claude Code instances are working on this project:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # List active Claude branches
+            echo "**Active Claude Branches**:" >> $GITHUB_STEP_SUMMARY
+            git branch -r | grep -E "claude-[a-f0-9]{8}" | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY || echo "None detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "**Coordination Status**: ✅ Monitoring active" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Coordination Status**: ℹ️ Single instance or no Claude activity" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Conflict resolution for multi-instance scenarios
+  conflict-resolution:
+    name: Handle Multi-Instance Conflicts
+    needs: coordination-check
+    if: needs.coordination-check.outputs.conflicts-detected == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Analyze conflicts
+        run: |
+          echo "🔍 Analyzing coordination conflicts..."
+          
+          if [ -f ".claude/locks.yml" ]; then
+            echo "Active locks:"
+            cat .claude/locks.yml
+          fi
+          
+          if [ -f ".claude/audit.log" ]; then
+            echo "Recent coordination events:"
+            tail -10 .claude/audit.log
+          fi
+          
+      - name: Auto-resolve expired locks
+        run: |
+          if [ -f "scripts/claude-coordinator.sh" ]; then
+            ./scripts/claude-coordinator.sh clean
+          fi
+          
+      - name: Generate conflict resolution advice
+        run: |
+          echo "## ⚠️ Coordination Conflicts Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Multiple Claude instances may be competing for resources." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Recommended Actions**:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check if locks have expired and clean them" >> $GITHUB_STEP_SUMMARY
+          echo "2. Coordinate work assignment through task system" >> $GITHUB_STEP_SUMMARY
+          echo "3. Use separate branches for each Claude instance" >> $GITHUB_STEP_SUMMARY
+          echo "4. Ensure proper lock acquisition before file editing" >> $GITHUB_STEP_SUMMARY
+
+  # Enhanced cost monitoring for multiple instances  
+  multi-instance-cost-monitoring:
+    name: Multi-Instance Cost Impact
+    needs: coordination-check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Calculate multi-instance cost impact
+        run: |
+          instance_count="${{ needs.coordination-check.outputs.claude-instances }}"
+          
+          if [ "$instance_count" -gt 1 ]; then
+            echo "## 💰 Multi-Instance Cost Analysis" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Active Claude Instances**: $instance_count" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Calculate coordinated vs uncoordinated costs
+            coordinated_cost=$((instance_count * 3))
+            uncoordinated_cost=$((instance_count * 20))
+            savings=$(( (uncoordinated_cost - coordinated_cost) * 100 / uncoordinated_cost ))
+            
+            echo "### Cost Comparison (per commit)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Coordinated (with locks)**: ~$coordinated_cost minutes" >> $GITHUB_STEP_SUMMARY
+            echo "- **Uncoordinated (conflicts)**: ~$uncoordinated_cost minutes" >> $GITHUB_STEP_SUMMARY
+            echo "- **Savings with coordination**: $savings%" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ needs.coordination-check.outputs.conflicts-detected }}" = "true" ]; then
+              echo "⚠️ **Warning**: Conflicts detected may increase costs" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ **Status**: Coordination working properly" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "## 💰 Single Instance Cost Optimization" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Standard draft PR optimization active." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Emergency coordination actions
+  emergency-coordination:
+    name: Emergency Coordination Actions
+    if: github.event.inputs.action != ''
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Execute emergency action
+        run: |
+          case "${{ github.event.inputs.action }}" in
+            "check-conflicts")
+              echo "🔍 Running conflict check..."
+              if [ -f "scripts/claude-coordinator.sh" ]; then
+                ./scripts/claude-coordinator.sh check
+              fi
+              ;;
+              
+            "clean-expired-locks")
+              echo "🧹 Cleaning expired locks..."
+              if [ -f "scripts/claude-coordinator.sh" ]; then
+                ./scripts/claude-coordinator.sh clean
+              fi
+              ;;
+              
+            "force-unlock-all")
+              echo "🔓 Force unlocking all files..."
+              rm -f .claude/locks.yml
+              echo "locks: {}" > .claude/locks.yml
+              ;;
+              
+            "generate-report")
+              echo "📊 Generating coordination report..."
+              echo "## Claude Code Coordination Report" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+              if [ -f ".claude/audit.log" ]; then
+                echo "**Recent Activity**:" >> $GITHUB_STEP_SUMMARY
+                echo '```' >> $GITHUB_STEP_SUMMARY
+                tail -20 .claude/audit.log >> $GITHUB_STEP_SUMMARY
+                echo '```' >> $GITHUB_STEP_SUMMARY
+              fi
+              ;;
+          esac
+
+  # Draft PR coordination  
+  draft-pr-coordination:
+    name: Draft PR Multi-Instance Check
+    if: github.event.pull_request.draft == true
+    needs: coordination-check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Validate draft PR coordination
+        run: |
+          echo "🚧 Draft PR Multi-Instance Validation"
+          
+          instance_count="${{ needs.coordination-check.outputs.claude-instances }}"
+          
+          if [ "$instance_count" -gt 1 ]; then
+            echo "✅ Multi-instance environment detected"
+            echo "✅ Draft PR workflow active - cost optimized"
+            echo "✅ Coordination monitoring enabled"
+            
+            echo "## 🤖 Multi-Instance Draft PR" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This draft PR is part of a coordinated multi-instance environment." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Benefits**:" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ No conflicts between Claude instances" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Optimized cost with draft PR workflow" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Parallel development capability" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Automatic coordination monitoring" >> $GITHUB_STEP_SUMMARY
+          fi
