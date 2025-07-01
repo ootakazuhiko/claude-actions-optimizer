@@ -21,6 +21,7 @@
 | [USAGE-GUIDE-ja.md](./USAGE-GUIDE-ja.md) | 実践的な使い方ガイド、シナリオ別の詳細手順 | 開発者、チームリーダー |
 | [DIAGRAMS-ja.md](./DIAGRAMS-ja.md) | システム構成図、フロー図、視覚的な説明 | アーキテクト、技術者 |
 | [FAQ-TROUBLESHOOTING-ja.md](./FAQ-TROUBLESHOOTING-ja.md) | よくある質問、トラブルシューティング、緊急対応 | サポート担当、管理者 |
+| [EXTERNAL-REFERENCE-GUIDE.md](./EXTERNAL-REFERENCE-GUIDE.md) | 外部プロジェクトからの参照・利用方法 | 統合担当者 |
 
 ### 📄 英語ドキュメント
 
@@ -37,6 +38,7 @@
 |---------|------|------|
 | [AUTO-SETUP-SCRIPT.sh](./AUTO-SETUP-SCRIPT.sh) | 対話型自動セットアップ | 完全自動導入 |
 | [install.sh](./install.sh) | メインインストーラー | 基本システム導入 |
+| [setup-external-reference.sh](./setup-external-reference.sh) | 外部参照セットアップ | 独立リポジトリ連携 |
 | [scripts/claude-coordinator.sh](./scripts/claude-coordinator.sh) | マルチインスタンス調整 | 競合防止管理 |
 | [scripts/claude-identity.sh](./scripts/claude-identity.sh) | 個体識別・役割管理 | Claude Code識別 |
 | [scripts/claude-review-check.sh](./scripts/claude-review-check.sh) | レビュー確認・適用 | フィードバック処理 |
@@ -73,6 +75,11 @@
 1. **[NEW-FEATURES-OVERVIEW-ja.md](./NEW-FEATURES-OVERVIEW-ja.md)** - 新機能の概要を確認
 2. **[QUICK-START-CHECKLIST-ja.md](./QUICK-START-CHECKLIST-ja.md)** - 5分でセットアップ
 3. **[README-ja.md](./README-ja.md)** - システムの詳細を理解
+
+### 外部プロジェクトから利用したい方
+1. **[EXTERNAL-REFERENCE-GUIDE.md](./EXTERNAL-REFERENCE-GUIDE.md)** - 参照方法の選択
+2. **[setup-external-reference.sh](./setup-external-reference.sh)** - 自動セットアップ
+3. **[USAGE-GUIDE-ja.md](./USAGE-GUIDE-ja.md)** - 利用方法の確認
 
 ### マルチインスタンスを導入したい方
 1. **[COMPLETE-SETUP-GUIDE-ja.md](./COMPLETE-SETUP-GUIDE-ja.md)** - 完全導入手順
