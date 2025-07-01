@@ -373,11 +373,27 @@ DEBUG=1 ./install.sh
 
 ---
 
+## 📚 ドキュメント
+
+### 🆕 新機能ガイド
+- **[NEW-FEATURES-OVERVIEW-ja.md](NEW-FEATURES-OVERVIEW-ja.md)** - 2024年新機能の概要
+- **[REVIEW-FEEDBACK-GUIDE-ja.md](REVIEW-FEEDBACK-GUIDE-ja.md)** - レビューフィードバックシステム
+- **[COMPLETE-SETUP-GUIDE-ja.md](COMPLETE-SETUP-GUIDE-ja.md)** - 完全導入ガイド
+- **[QUICK-START-CHECKLIST-ja.md](QUICK-START-CHECKLIST-ja.md)** - 5分クイックスタート
+
+### 📖 基本ガイド
+- **[USAGE-GUIDE-ja.md](USAGE-GUIDE-ja.md)** - 詳細な使用方法とシナリオ別ガイド
+- **[DIAGRAMS-ja.md](DIAGRAMS-ja.md)** - システム構成図とフローチャート
+- **[FAQ-TROUBLESHOOTING-ja.md](FAQ-TROUBLESHOOTING-ja.md)** - よくある質問とトラブルシューティング
+
+### 📂 全ドキュメント一覧
+- **[DOCUMENTATION-INDEX-ja.md](DOCUMENTATION-INDEX-ja.md)** - 全ドキュメントの索引と目的別ガイド
+
 ## 📞 サポート
 
 - **Issues**: [GitHub Issues](https://github.com/ootakazuhiko/claude-actions-optimizer/issues)
-- **ドキュメント**: [詳細ドキュメント](https://github.com/ootakazuhiko/claude-actions-optimizer/docs)
 - **コミュニティ**: [Discussions](https://github.com/ootakazuhiko/claude-actions-optimizer/discussions)
+- **機能リクエスト**: Issueに`enhancement`ラベルを付けて作成
 
 ---
 

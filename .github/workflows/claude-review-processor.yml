@@ -1,0 +1,269 @@
+name: Claude Review Processor
+
+on:
+  issue_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  process-review:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event.issue.pull_request && contains(github.event.comment.body, '@claude-review')) ||
+      contains(github.event.review.body, '@claude-review') ||
+      contains(github.event.comment.body, '@claude-review')
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Extract Claude Instance Info
+        id: extract
+        run: |
+          # レビュー本文を取得
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            COMMENT_BODY="${{ github.event.comment.body }}"
+          elif [ "${{ github.event_name }}" = "pull_request_review" ]; then
+            COMMENT_BODY="${{ github.event.review.body }}"
+          else
+            COMMENT_BODY="${{ github.event.comment.body }}"
+          fi
+          
+          # インスタンスIDを抽出 [Role-Name-Timestamp]
+          INSTANCE_ID=$(echo "$COMMENT_BODY" | grep -oE '\[([A-Za-z]+-[A-Za-z]+-[0-9]+)\]' | head -1 | tr -d '[]')
+          
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "❌ No Claude instance ID found in review"
+            exit 0
+          fi
+          
+          # インスタンス情報を分解
+          ROLE=$(echo "$INSTANCE_ID" | cut -d'-' -f1)
+          NAME=$(echo "$INSTANCE_ID" | cut -d'-' -f2)
+          TIMESTAMP=$(echo "$INSTANCE_ID" | cut -d'-' -f3)
+          
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "role=$ROLE" >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          
+          # レビュー本文を一時ファイルに保存
+          echo "$COMMENT_BODY" > review_body.txt
+      
+      - name: Parse Review Content
+        id: parse
+        if: steps.extract.outputs.instance_id != ''
+        run: |
+          # Pythonでレビュー内容を解析
+          cat > parse_review.py << 'EOF'
+          import re
+          import json
+          import sys
+          
+          with open('review_body.txt', 'r') as f:
+              content = f.read()
+          
+          # レビュー情報を抽出
+          review_data = {
+              'type': 'general',
+              'severity': 'medium',
+              'content': {
+                  'summary': '',
+                  'problems': [],
+                  'suggestions': [],
+                  'code_examples': []
+              },
+              'action_items': []
+          }
+          
+          # タイプを判定
+          if re.search(r'(?i)(code review|コードレビュー)', content):
+              review_data['type'] = 'code'
+          elif re.search(r'(?i)(design review|設計レビュー)', content):
+              review_data['type'] = 'design'
+          elif re.search(r'(?i)(security review|セキュリティレビュー)', content):
+              review_data['type'] = 'security'
+          elif re.search(r'(?i)(performance review|パフォーマンスレビュー)', content):
+              review_data['type'] = 'performance'
+          
+          # 重要度を判定
+          if re.search(r'(?i)(severity:\s*high|重要度:\s*高|🔴)', content):
+              review_data['severity'] = 'high'
+          elif re.search(r'(?i)(severity:\s*low|重要度:\s*低|🟢)', content):
+              review_data['severity'] = 'low'
+          
+          # サマリーを抽出
+          summary_match = re.search(r'(?i)(?:summary|要約|概要)[:：]\s*(.+?)(?:\n|$)', content)
+          if summary_match:
+              review_data['content']['summary'] = summary_match.group(1).strip()
+          
+          # 問題点を抽出
+          problems_section = re.search(r'(?i)(?:problems?|問題点|issues?)[:：\n]+(.+?)(?=\n#{1,3}|\n\n|$)', content, re.DOTALL)
+          if problems_section:
+              problems = re.findall(r'[-•*]\s*(.+)', problems_section.group(1))
+              review_data['content']['problems'] = [p.strip() for p in problems]
+          
+          # アクションアイテムを抽出
+          action_items = re.findall(r'\[\s*\]\s*(.+)', content)
+          review_data['action_items'] = [item.strip() for item in action_items]
+          
+          # 結果を出力
+          with open('review_data.json', 'w') as f:
+              json.dump(review_data, f, indent=2, ensure_ascii=False)
+          
+          print(f"severity={review_data['severity']}")
+          print(f"type={review_data['type']}")
+          print(f"action_items_count={len(review_data['action_items'])}")
+          EOF
+          
+          python3 parse_review.py >> $GITHUB_OUTPUT
+      
+      - name: Store Review Feedback
+        if: steps.extract.outputs.instance_id != ''
+        run: |
+          # レビューを構造化して保存
+          mkdir -p .claude/reviews/${{ steps.extract.outputs.instance_id }}
+          
+          # PR番号を取得
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            PR_NUMBER="${{ github.event.issue.number }}"
+          else
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+          
+          # レビューワーを取得
+          if [ "${{ github.event_name }}" = "pull_request_review" ]; then
+            REVIEWER="${{ github.event.review.user.login }}"
+            REVIEW_URL="${{ github.event.review.html_url }}"
+          else
+            REVIEWER="${{ github.event.comment.user.login }}"
+            REVIEW_URL="${{ github.event.comment.html_url }}"
+          fi
+          
+          # レビューJSONを作成
+          cat > .claude/reviews/${{ steps.extract.outputs.instance_id }}/review-${{ github.run_id }}.json << EOF
+          {
+            "review_id": "${{ github.run_id }}",
+            "instance_id": "${{ steps.extract.outputs.instance_id }}",
+            "pr_number": "$PR_NUMBER",
+            "reviewer": "$REVIEWER",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "review_type": "$(cat review_data.json | jq -r .type)",
+            "severity": "$(cat review_data.json | jq -r .severity)",
+            "content": $(cat review_data.json | jq .content),
+            "action_items": $(cat review_data.json | jq .action_items),
+            "github_url": "$REVIEW_URL",
+            "status": "pending"
+          }
+          EOF
+          
+          echo "✅ Review stored successfully"
+          
+      - name: Create Review Issue for High Severity
+        if: steps.parse.outputs.severity == 'high' && steps.extract.outputs.instance_id != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const instanceId = '${{ steps.extract.outputs.instance_id }}';
+            const role = '${{ steps.extract.outputs.role }}';
+            const name = '${{ steps.extract.outputs.name }}';
+            
+            // レビューデータを読み込み
+            const reviewData = JSON.parse(fs.readFileSync('review_data.json', 'utf8'));
+            
+            // PR番号を取得
+            const prNumber = context.payload.issue?.number || context.payload.pull_request?.number;
+            
+            // 高重要度レビューの場合、専用Issueを作成
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Review] Action required for ${name} (${role}) - PR #${prNumber}`,
+              body: `## 📋 高重要度レビューフィードバック
+              
+              **対象Claude**: ${name} (${role})
+              **Instance ID**: \`${instanceId}\`
+              **PR**: #${prNumber}
+              **レビュアー**: @${context.payload.comment?.user.login || context.payload.review?.user.login}
+              **重要度**: 🔴 HIGH
+              
+              ### 📌 要約
+              ${reviewData.content.summary || 'レビューの要約を確認してください'}
+              
+              ### ⚠️ 問題点
+              ${reviewData.content.problems.map(p => `- ${p}`).join('\n')}
+              
+              ### ✅ アクションアイテム
+              ${reviewData.action_items.map(item => `- [ ] ${item}`).join('\n')}
+              
+              ---
+              [元のレビューを見る](${context.payload.comment?.html_url || context.payload.review?.html_url})
+              
+              @${name} このレビューは高重要度として設定されています。早急な対応をお願いします。`,
+              labels: [`claude:${role}`, `claude:${name}`, 'review-feedback', 'high-priority', 'action-required']
+            });
+            
+            console.log(`Created issue #${issue.data.number} for high severity review`);
+      
+      - name: Add PR Comment
+        if: steps.extract.outputs.instance_id != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const instanceId = '${{ steps.extract.outputs.instance_id }}';
+            const name = '${{ steps.extract.outputs.name }}';
+            const role = '${{ steps.extract.outputs.role }}';
+            const severity = '${{ steps.parse.outputs.severity }}';
+            const actionItemsCount = '${{ steps.parse.outputs.action_items_count }}';
+            
+            // PR番号を取得
+            const prNumber = context.payload.issue?.number || context.payload.pull_request?.number;
+            
+            if (!prNumber) return;
+            
+            // 重要度に応じた絵文字
+            const severityEmoji = {
+              'high': '🔴',
+              'medium': '🟡',
+              'low': '🟢'
+            }[severity] || '⚪';
+            
+            const comment = `🤖 **Claude Review Feedback Processed**
+            
+            - **Target**: ${name} (${role})
+            - **Instance ID**: \`${instanceId}\`
+            - **Severity**: ${severityEmoji} ${severity.toUpperCase()}
+            - **Action Items**: ${actionItemsCount}
+            
+            Review has been stored and is available for the Claude instance to process.
+            
+            To check this review:
+            \`\`\`bash
+            ./scripts/claude-review-check.sh pr ${prNumber}
+            \`\`\``;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: comment
+            });
+      
+      - name: Commit Review Data
+        if: steps.extract.outputs.instance_id != ''
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add .claude/reviews/
+          git commit -m "chore: store review feedback for ${{ steps.extract.outputs.instance_id }}
+          
+          Review from @${{ github.event.comment.user.login || github.event.review.user.login }}
+          PR: #${{ github.event.issue.number || github.event.pull_request.number }}
+          Severity: ${{ steps.parse.outputs.severity }}
+          Type: ${{ steps.parse.outputs.type }}"
+          
+          git push origin HEAD
