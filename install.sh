@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(pwd)"
 
-echo "🤖 Claude Code GitHub Actions最適化システム"
+echo "Claude Code GitHub Actions最適化システム"
 echo "Universal installer for any project"
 echo ""
 echo "プロジェクトディレクトリ: $PROJECT_ROOT"
@@ -15,7 +15,7 @@ echo "インストーラーディレクトリ: $SCRIPT_DIR"
 echo ""
 
 # プロジェクトの基本情報を収集
-echo "📋 プロジェクト情報の収集..."
+echo "プロジェクト情報の収集..."
 
 # プロジェクト名の取得
 PROJECT_NAME=$(basename "$PROJECT_ROOT")
@@ -62,13 +62,13 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # ディレクトリ構造の作成
-echo "📁 ディレクトリ構造を作成中..."
+echo "ディレクトリ構造を作成中..."
 mkdir -p .github/workflows
 mkdir -p .github/actions/claude-code-guard
 mkdir -p docs
 
 # 1. 基本的なCLAUDE.mdの作成
-echo "📝 CLAUDE.mdを作成中..."
+echo "CLAUDE.mdを作成中..."
 cat > CLAUDE.md << EOF
 # CLAUDE.md
 
@@ -164,7 +164,7 @@ Before any PR creation, Claude Code must:
 EOF
 
 # 2. 緊急停止スクリプトの作成
-echo "🛑 緊急停止スクリプトを作成中..."
+echo "緊急停止スクリプトを作成中..."
 
 cat > .github/disable-all-workflows.sh << 'EOF'
 #!/bin/bash
@@ -271,7 +271,7 @@ echo "GitHub Actionsが再度有効になりました。"
 EOF
 
 # 3. ドラフトPR対応の基本ワークフローを作成
-echo "⚙️ 基本ワークフローを作成中..."
+echo "基本ワークフローを作成中..."
 
 cat > .github/workflows/draft-pr-optimization.yml << 'EOF'
 name: Draft PR Cost Optimization
@@ -438,7 +438,7 @@ jobs:
 EOF
 
 # 5. ドキュメントの作成
-echo "📚 ドキュメントを作成中..."
+echo "ドキュメントを作成中..."
 
 cat > docs/DRAFT_PR_GUIDELINES.md << 'EOF'
 # Draft PR Guidelines - Cost Optimization
@@ -565,26 +565,26 @@ EXPECTED_SAVINGS=80-95%
 EOF
 
 echo ""
-echo "🎉 Claude Code最適化システムのインストール完了！"
+echo "Claude Code最適化システムのインストール完了！"
 echo ""
-echo "📊 インストール内容:"
-echo "  ✅ CLAUDE.md - Claude Code必読の最適化指針"
-echo "  ✅ 緊急停止スクリプト - 即座にActions停止可能"
-echo "  ✅ ドラフトPR最適化ワークフロー - 自動コスト削減"
-echo "  ✅ Claude Code監視システム - 準拠チェック"
-echo "  ✅ 包括的ドキュメント - 運用ガイド"
+echo "インストール内容:"
+echo "  - CLAUDE.md - Claude Code必読の最適化指針"
+echo "  - 緊急停止スクリプト - 即座にActions停止可能"
+echo "  - ドラフトPR最適化ワークフロー - 自動コスト削減"
+echo "  - Claude Code監視システム - 準拠チェック"
+echo "  - 包括的ドキュメント - 運用ガイド"
 echo ""
-echo "💰 期待効果:"
+echo "期待効果:"
 echo "  - Draft PR使用: 80-95%のコスト削減"
 echo "  - 緊急停止: 必要時に100%停止可能"
 echo "  - 自動監視: Claude Code準拠チェック"
 echo ""
-echo "📋 次のステップ:"
+echo "次のステップ:"
 echo "1. git add . && git commit -m \"feat: Claude Code最適化システム導入\""
 echo "2. Claude Codeでの作業時は自動的に最適化が適用されます"
 echo "3. 新しいPRは必ず --draft フラグで作成してください"
 echo ""
-echo "📖 詳細情報:"
+echo "詳細情報:"
 echo "  - 運用ガイド: docs/DRAFT_PR_GUIDELINES.md"
 echo "  - 緊急対応: .github/README.md"
 echo "  - Claude Code指針: CLAUDE.md"
