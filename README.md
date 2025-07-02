@@ -16,7 +16,7 @@
 
 ```bash
 # 1. このシステムをダウンロード
-curl -sSL https://raw.githubusercontent.com/your-repo/claude-actions-optimizer/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/ootakazuhiko/claude-actions-optimizer/main/install.sh | bash
 
 # または、手動でファイルをコピーしてから：
 cd your-project
@@ -166,7 +166,7 @@ ls -la .github/ | grep workflows-disabled
 
 ```bash
 # 最新版のダウンロードと再実行
-curl -sSL https://raw.githubusercontent.com/your-repo/claude-actions-optimizer/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/ootakazuhiko/claude-actions-optimizer/main/install.sh | bash
 ```
 
 ## 📞 サポート
