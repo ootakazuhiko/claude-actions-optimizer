@@ -53,9 +53,9 @@ if [ -d ".github/workflows" ]; then
 fi
 echo "既存ワークフロー数: $EXISTING_WORKFLOWS"
 
-printf "\n"
+echo ""
 read -p "このプロジェクトにClaude Code最適化を適用しますか？ (y/N): " -n 1 -r
-printf "\n"
+echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "キャンセルしました"
     exit 0
