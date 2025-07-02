@@ -54,8 +54,13 @@ fi
 echo "既存ワークフロー数: $EXISTING_WORKFLOWS"
 
 echo ""
-read -p "このプロジェクトにClaude Code最適化を適用しますか？ (y/N): " -n 1 -r
-echo ""
+if [ -t 0 ]; then
+    read -p "このプロジェクトにClaude Code最適化を適用しますか？ (y/N): " -n 1 -r
+    echo ""
+else
+    echo "非対話モードで実行中。自動的に続行します。"
+    REPLY="y"
+fi
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "キャンセルしました"
     exit 0
